@@ -73,7 +73,7 @@ export default function PhasesPage({ params }: { params: { id: string } }) {
       setPhases((prev) =>
         prev.map((p) =>
           p._id === phaseId
-            ? { ...p, ...payload, completionPercent: Number(payload.completionPercent) }
+            ? { ...p, ...payload, completionPercent: Number(payload.completionPercent) } as Phase
             : p
         )
       );
