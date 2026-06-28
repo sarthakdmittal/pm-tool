@@ -255,24 +255,6 @@ export default function PassivePage({ params }: { params: Promise<{ id: string }
                 })
               )}
             </tbody>
-            {items.length > 0 && (
-              <tfoot className="bg-gray-50 border-t border-gray-200">
-                <tr className="font-semibold text-gray-800 text-sm">
-                  <td className="px-3 py-3" colSpan={2}>
-                    TOTAL
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    {summary?.totalAllocated?.toLocaleString() ?? 0}
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    {summary?.totalCompleted?.toLocaleString() ?? 0}
-                  </td>
-                  <td colSpan={2} />
-                  <td className="px-3 py-3">{summary?.completionPercent ?? 0}%</td>
-                  <td />
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
       </div>
