@@ -26,18 +26,21 @@ app.use(helmet());
 app.use(morgan('combined'));
 
 // CORS
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000',
-  'http://localhost:3000',
-];
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      // Allow localhost (any port) and all vercel.app domains
+      if (
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('http://127.0.0.1') ||
+        origin.endsWith('.vercel.app') ||
+        origin === process.env.FRONTEND_URL
+      ) {
+        return callback(null, true);
       }
+      callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
   })
