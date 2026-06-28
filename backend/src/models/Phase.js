@@ -9,7 +9,6 @@ const phaseSchema = new mongoose.Schema(
     },
     phaseName: {
       type: String,
-      enum: ['supply', 'installation', 'testing', 'handover'],
       required: [true, 'Phase name is required'],
     },
     startDate: {
