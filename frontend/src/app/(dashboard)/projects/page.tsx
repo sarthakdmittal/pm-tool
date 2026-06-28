@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PlusIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { isAdmin } from '@/lib/auth';
 import { Project } from '@/types';
 import ProjectCard from '@/components/projects/ProjectCard';
 import Button from '@/components/ui/Button';
@@ -24,6 +25,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('all');
+  const admin = isAdmin();
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -65,12 +67,14 @@ export default function ProjectsPage() {
               Upload Excel
             </Button>
           </Link>
-          <Link href="/projects/new">
-            <Button variant="primary" size="md">
-              <PlusIcon className="h-4 w-4" />
-              New Project
-            </Button>
-          </Link>
+          {admin && (
+            <Link href="/projects/new">
+              <Button variant="primary" size="md">
+                <PlusIcon className="h-4 w-4" />
+                New Project
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { isAdmin } from '@/lib/auth';
 import { EPBAXItem } from '@/types';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -56,6 +57,7 @@ export default function EPBAXPage({ params }: { params: Promise<{ id: string }> 
   const [isSaving, setIsSaving] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EPBAXForm>();
+  const admin = isAdmin();
 
   const fetchData = async () => {
     try {
@@ -143,9 +145,11 @@ export default function EPBAXPage({ params }: { params: Promise<{ id: string }> 
           </Link>
           <h2 className="text-2xl font-bold text-gray-900">EPBAX</h2>
         </div>
-        <Button variant="primary" size="sm" onClick={openAdd}>
-          <PlusIcon className="h-4 w-4" /> Add Item
-        </Button>
+        {admin && (
+          <Button variant="primary" size="sm" onClick={openAdd}>
+            <PlusIcon className="h-4 w-4" /> Add Item
+          </Button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -213,12 +217,14 @@ export default function EPBAXPage({ params }: { params: Promise<{ id: string }> 
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(item._id)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {admin && (
+                          <button
+                            onClick={() => handleDelete(item._id)}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

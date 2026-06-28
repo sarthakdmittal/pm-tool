@@ -61,7 +61,12 @@ const createMaterial = async (req, res, next) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const materialData = { ...req.body, project: req.params.id };
+    const body = { ...req.body };
+    const orderedQty = Number(body.orderedQty) || 0;
+    const executedQty = Number(body.executedQty) || 0;
+    body.remainingQty = orderedQty - executedQty;
+
+    const materialData = { ...body, project: req.params.id };
     const material = await Material.create(materialData);
     res.status(201).json(material);
   } catch (error) {
@@ -80,7 +85,12 @@ const updateMaterial = async (req, res, next) => {
       return res.status(404).json({ message: 'Material not found' });
     }
 
-    Object.assign(material, req.body);
+    const body = { ...req.body };
+    const orderedQty = Number(body.orderedQty) !== undefined ? Number(body.orderedQty) : (material.orderedQty || 0);
+    const executedQty = Number(body.executedQty) !== undefined ? Number(body.executedQty) : (material.executedQty || 0);
+    body.remainingQty = orderedQty - executedQty;
+
+    Object.assign(material, body);
     await material.save();
     res.json(material);
   } catch (error) {

@@ -6,6 +6,7 @@ import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { isAdmin } from '@/lib/auth';
 import { Task, Phase } from '@/types';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -36,6 +37,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   const [isSaving, setIsSaving] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskForm>();
+  const admin = isAdmin();
 
   const fetchData = async () => {
     try {
@@ -129,9 +131,11 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           <h2 className="text-2xl font-bold text-gray-900">Tasks</h2>
           <span className="text-sm text-gray-500">({tasks.length} total)</span>
         </div>
-        <Button variant="primary" size="sm" onClick={openAdd}>
-          <PlusIcon className="h-4 w-4" /> Add Task
-        </Button>
+        {admin && (
+          <Button variant="primary" size="sm" onClick={openAdd}>
+            <PlusIcon className="h-4 w-4" /> Add Task
+          </Button>
+        )}
       </div>
 
       {/* Phase Filter */}
@@ -232,12 +236,14 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(task._id)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {admin && (
+                          <button
+                            onClick={() => handleDelete(task._id)}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

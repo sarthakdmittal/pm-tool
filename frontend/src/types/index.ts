@@ -18,6 +18,19 @@ export interface Project {
   status: 'active' | 'completed' | 'on_hold' | 'delayed';
   createdAt: string;
   overallCompletion?: number;
+  totalContractValue?: number;
+}
+
+export interface Payment {
+  _id: string;
+  project: string;
+  invoiceNumber?: string;
+  description?: string;
+  amount: number;
+  paymentDate?: string;
+  dueDate?: string;
+  status: 'pending' | 'received' | 'overdue';
+  notes?: string;
 }
 
 export interface Phase {
@@ -131,6 +144,14 @@ export interface ActiveDeviceStats {
   totalDevicesInstalled: number;
   columns: string[];
   columnTotals: Record<string, number>;
+  expectedTotals?: Record<string, number>;
+  activeDeviceCompletionPercent?: number;
+}
+
+export interface PaymentStats {
+  totalContract: number;
+  totalReceived: number;
+  percentPaid: number;
 }
 
 export interface ProjectStats {
@@ -152,6 +173,7 @@ export interface ProjectStats {
   passiveStats: PassiveStats;
   epbaxStats: EPBAXStats;
   activeDeviceStats: ActiveDeviceStats;
+  paymentStats?: PaymentStats;
 }
 
 export interface AuthResponse {

@@ -6,6 +6,7 @@ const Task = require('../models/Task');
 const { ActiveDevice, ActiveDeviceColumn } = require('../models/ActiveDevice');
 const EPBAXItem = require('../models/EPBAXItem');
 const PassiveItem = require('../models/PassiveItem');
+const Payment = require('../models/Payment');
 
 const PHASE_NAMES = ['supply', 'installation', 'testing', 'handover'];
 
@@ -129,6 +130,7 @@ const deleteProject = async (req, res, next) => {
     await ActiveDeviceColumn.deleteMany({ project: project._id });
     await EPBAXItem.deleteMany({ project: project._id });
     await PassiveItem.deleteMany({ project: project._id });
+    await Payment.deleteMany({ project: project._id });
     await project.deleteOne();
 
     res.json({ message: 'Project deleted successfully' });
@@ -146,7 +148,7 @@ const getProjectStats = async (req, res, next) => {
 
     const projectId = project._id;
 
-    const [phases, tasks, materialAgg, passiveAgg, epbaxItems, activeDevices, columnDoc] =
+    const [phases, tasks, materialAgg, passiveAgg, epbaxItems, activeDevices, columnDoc, payments] =
       await Promise.all([
         Phase.find({ project: projectId }),
         Task.find({ project: projectId }),
@@ -186,6 +188,7 @@ const getProjectStats = async (req, res, next) => {
         EPBAXItem.find({ project: projectId }),
         ActiveDevice.find({ project: projectId }),
         ActiveDeviceColumn.findOne({ project: projectId }),
+        Payment.find({ project: projectId }),
       ]);
 
     const now = new Date();
@@ -236,6 +239,7 @@ const getProjectStats = async (req, res, next) => {
 
     // Active device column totals
     const columns = columnDoc ? columnDoc.columns : [];
+    const expectedTotalsMap = columnDoc && columnDoc.columnTotals ? Object.fromEntries(columnDoc.columnTotals) : {};
     const columnTotals = {};
     columns.forEach((col) => { columnTotals[col] = 0; });
     activeDevices.forEach((entry) => {
@@ -244,12 +248,27 @@ const getProjectStats = async (req, res, next) => {
       });
     });
     const totalDevicesInstalled = Object.values(columnTotals).reduce((a, b) => a + b, 0);
+    const totalExpected = Object.values(expectedTotalsMap).reduce((a, b) => a + b, 0);
+    const activeDeviceCompletionPercent = totalExpected > 0
+      ? Math.min(100, Math.round((totalDevicesInstalled / totalExpected) * 100))
+      : 0;
+
     const activeDeviceStats = {
       totalLocations: activeDevices.length,
       totalDevicesInstalled,
       columns,
       columnTotals,
+      expectedTotals: expectedTotalsMap,
+      activeDeviceCompletionPercent,
     };
+
+    // Payment summary
+    const totalContract = project.totalContractValue || 0;
+    const totalReceived = payments
+      .filter((p) => p.status === 'received')
+      .reduce((sum, p) => sum + p.amount, 0);
+    const percentPaid = totalContract > 0 ? Math.min(100, Math.round((totalReceived / totalContract) * 100)) : 0;
+    const paymentStats = { totalContract, totalReceived, percentPaid };
 
     res.json({
       overallCompletion,
@@ -264,6 +283,7 @@ const getProjectStats = async (req, res, next) => {
       passiveStats: passStats,
       epbaxStats,
       activeDeviceStats,
+      paymentStats,
     });
   } catch (error) {
     next(error);

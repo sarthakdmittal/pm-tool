@@ -16,10 +16,12 @@ import {
   PhoneIcon,
   CpuChipIcon,
   ClipboardDocumentListIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { Project, ProjectStats } from '@/types';
+import { isAdmin } from '@/lib/auth';
 import Badge from '@/components/ui/Badge';
 import StatsCard from '@/components/projects/StatsCard';
 import PhaseProgress from '@/components/projects/PhaseProgress';
@@ -53,6 +55,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EditForm>();
+  const admin = isAdmin();
 
   const fetchData = async () => {
     try {
@@ -120,7 +123,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   if (!project || !stats) return null;
 
-  const { materialStats, passiveStats, epbaxStats, activeDeviceStats } = stats;
+  const { materialStats, passiveStats, epbaxStats, activeDeviceStats, paymentStats } = stats;
+  const bothZero = stats.overallCompletion === 0 && stats.expectedCompletion === 0;
 
   return (
     <div className="space-y-6">
@@ -158,9 +162,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <Button variant="secondary" size="sm" onClick={() => setIsEditOpen(true)}>
             <PencilIcon className="h-4 w-4" /> Edit
           </Button>
-          <Button variant="danger" size="sm" onClick={() => setIsDeleteOpen(true)}>
-            <TrashIcon className="h-4 w-4" /> Delete
-          </Button>
+          {admin && (
+            <Button variant="danger" size="sm" onClick={() => setIsDeleteOpen(true)}>
+              <TrashIcon className="h-4 w-4" /> Delete
+            </Button>
+          )}
         </div>
       </div>
 
@@ -168,17 +174,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       <div
         className={cx(
           'rounded-xl px-5 py-3 flex items-center gap-3 text-sm font-medium',
-          stats.isOnTrack
+          bothZero
+            ? 'bg-gray-50 text-gray-700 border border-gray-200'
+            : stats.isOnTrack
             ? 'bg-green-50 text-green-800 border border-green-200'
             : 'bg-red-50 text-red-800 border border-red-200'
         )}
       >
-        {stats.isOnTrack ? (
+        {bothZero ? (
+          <ClockIcon className="h-5 w-5 text-gray-500" />
+        ) : stats.isOnTrack ? (
           <CheckCircleIcon className="h-5 w-5 text-green-600" />
         ) : (
           <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
         )}
-        {stats.isOnTrack
+        {bothZero
+          ? `Project not yet started — timeline begins on ${formatDate(project.startDate)}`
+          : stats.isOnTrack
           ? `Project is on track — ${formatPercent(stats.overallCompletion)} complete vs ${formatPercent(stats.expectedCompletion)} expected`
           : `Project is behind schedule — ${formatPercent(stats.overallCompletion)} complete vs ${formatPercent(stats.expectedCompletion)} expected`}
       </div>
@@ -188,7 +200,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <StatsCard
           label="Overall Complete"
           value={formatPercent(stats.overallCompletion)}
-          subtitle="Avg of all phases"
+          subtitle="Update via Phases tab"
           icon={<CheckCircleIcon className="h-6 w-6" />}
           accent={stats.isOnTrack ? 'green' : 'red'}
         />
@@ -290,19 +302,49 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <WifiIcon className="h-5 w-5 text-teal-500" />
               <h3 className="font-semibold text-gray-900">Passive Cabling</h3>
             </div>
-            <div className="flex gap-4 text-sm mb-3">
-              <span className="text-gray-600">
-                <strong>{passiveStats?.totalCompleted?.toLocaleString() ?? 0}</strong> m done
-              </span>
-              <span className="text-gray-400">
-                / {passiveStats?.totalAllocated?.toLocaleString() ?? 0} m
-              </span>
+            <div className="text-3xl font-bold text-teal-600 mb-3">
+              {passiveStats?.completionPercent ?? 0}%
             </div>
             <ProgressBar value={passiveStats?.completionPercent ?? 0} size="sm" />
-            <p className="text-xs text-gray-400 mt-1">{passiveStats?.completionPercent ?? 0}% complete</p>
+            {((passiveStats?.totalCompleted ?? 0) > 0 || (passiveStats?.totalAllocated ?? 0) > 0) && (
+              <p className="text-xs text-gray-400 mt-1">
+                {passiveStats?.totalCompleted?.toLocaleString() ?? 0} m done / {passiveStats?.totalAllocated?.toLocaleString() ?? 0} m
+              </p>
+            )}
           </div>
         </Link>
       </div>
+
+      {/* Payment summary card */}
+      {paymentStats && paymentStats.totalContract > 0 && (
+        <Link href={`/projects/${project._id}/payments`} className="block group">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-blue-300 transition-colors">
+            <div className="flex items-center gap-2 mb-3">
+              <CurrencyDollarIcon className="h-5 w-5 text-emerald-500" />
+              <h3 className="font-semibold text-gray-900">Payments</h3>
+            </div>
+            <div className="flex gap-6 text-sm mb-3">
+              <div>
+                <div className="text-xs text-gray-500">Contract Value</div>
+                <div className="text-lg font-bold text-gray-800">
+                  ₹{paymentStats.totalContract.toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Received</div>
+                <div className="text-lg font-bold text-green-600">
+                  ₹{paymentStats.totalReceived.toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">% Paid</div>
+                <div className="text-lg font-bold text-blue-600">{paymentStats.percentPaid}%</div>
+              </div>
+            </div>
+            <ProgressBar value={paymentStats.percentPaid} size="sm" />
+          </div>
+        </Link>
+      )}
 
       {/* Active Device summary */}
       {(activeDeviceStats?.columns?.length ?? 0) > 0 && (
@@ -316,6 +358,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 {activeDeviceStats?.totalDevicesInstalled ?? 0} total devices
               </span>
             </div>
+            {(activeDeviceStats?.activeDeviceCompletionPercent ?? 0) > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-500">Installation Progress</span>
+                  <span className="text-xs font-semibold text-purple-600">
+                    {activeDeviceStats?.activeDeviceCompletionPercent ?? 0}%
+                  </span>
+                </div>
+                <ProgressBar value={activeDeviceStats?.activeDeviceCompletionPercent ?? 0} size="sm" />
+              </div>
+            )}
             <div className="flex flex-wrap gap-4">
               {(activeDeviceStats?.columns ?? []).map((col) => (
                 <div key={col} className="text-center min-w-[60px]">

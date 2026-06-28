@@ -14,6 +14,7 @@ import {
   WifiIcon,
   CheckCircleIcon,
   ChartBarIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { cx } from '@/lib/utils';
 
@@ -75,6 +76,12 @@ const Sidebar: React.FC = () => {
           href: `/projects/${projectId}/tasks`,
           label: 'Tasks',
           icon: CheckCircleIcon,
+          exact: false,
+        },
+        {
+          href: `/projects/${projectId}/payments`,
+          label: 'Payments',
+          icon: CurrencyDollarIcon,
           exact: false,
         },
       ]

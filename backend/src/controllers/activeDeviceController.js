@@ -12,30 +12,46 @@ const getActiveDevices = async (req, res, next) => {
     ]);
 
     const columns = columnDoc ? columnDoc.columns : [];
+    const expectedTotals = columnDoc && columnDoc.columnTotals ? Object.fromEntries(columnDoc.columnTotals) : {};
 
     // Build summary: total devices installed per column
-    const columnTotals = {};
-    columns.forEach((col) => { columnTotals[col] = 0; });
+    const installedTotals = {};
+    columns.forEach((col) => { installedTotals[col] = 0; });
     entries.forEach((entry) => {
       entry.deviceItems.forEach((item) => {
-        if (columnTotals[item.itemName] !== undefined) {
-          columnTotals[item.itemName] += item.quantity;
+        if (installedTotals[item.itemName] !== undefined) {
+          installedTotals[item.itemName] += item.quantity;
         } else {
-          columnTotals[item.itemName] = (columnTotals[item.itemName] || 0) + item.quantity;
+          installedTotals[item.itemName] = (installedTotals[item.itemName] || 0) + item.quantity;
         }
       });
     });
 
-    const totalDevicesInstalled = Object.values(columnTotals).reduce((a, b) => a + b, 0);
+    const totalDevicesInstalled = Object.values(installedTotals).reduce((a, b) => a + b, 0);
     const totalLocations = entries.length;
+
+    // Build per-device completion stats
+    const deviceStats = {};
+    columns.forEach((col) => {
+      const installed = installedTotals[col] || 0;
+      const expected = expectedTotals[col] || 0;
+      deviceStats[col] = {
+        installed,
+        expected,
+        remaining: Math.max(0, expected - installed),
+        completionPercent: expected > 0 ? Math.min(100, Math.round((installed / expected) * 100)) : 0,
+      };
+    });
 
     res.json({
       entries,
       columns,
+      expectedTotals,
       summary: {
         totalLocations,
         totalDevicesInstalled,
-        columnTotals,
+        columnTotals: installedTotals,
+        deviceStats,
       },
     });
   } catch (error) {
@@ -95,9 +111,27 @@ const deleteActiveDevice = async (req, res, next) => {
 
 const updateColumns = async (req, res, next) => {
   try {
+    const updateData = { project: req.params.id, columns: req.body.columns || [] };
+    if (req.body.columnTotals) {
+      updateData.columnTotals = req.body.columnTotals;
+    }
     const doc = await ActiveDeviceColumn.findOneAndUpdate(
       { project: req.params.id },
-      { project: req.params.id, columns: req.body.columns || [] },
+      updateData,
+      { upsert: true, new: true }
+    );
+    res.json(doc);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateExpectedTotals = async (req, res, next) => {
+  try {
+    // req.body.columnTotals is a map of deviceName -> expectedTotal
+    const doc = await ActiveDeviceColumn.findOneAndUpdate(
+      { project: req.params.id },
+      { $set: { columnTotals: req.body.columnTotals || {} } },
       { upsert: true, new: true }
     );
     res.json(doc);
@@ -113,4 +147,5 @@ module.exports = {
   updateActiveDevice,
   deleteActiveDevice,
   updateColumns,
+  updateExpectedTotals,
 };

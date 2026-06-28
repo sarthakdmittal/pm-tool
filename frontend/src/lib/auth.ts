@@ -43,6 +43,11 @@ export const isAuthenticated = (): boolean => {
   return !!getToken();
 };
 
+export const isAdmin = (): boolean => {
+  const user = getUser();
+  return user?.role === 'admin';
+};
+
 export const logout = (): void => {
   removeToken();
   removeUser();

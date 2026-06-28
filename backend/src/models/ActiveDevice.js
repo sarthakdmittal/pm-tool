@@ -26,6 +26,7 @@ const ActiveDeviceColumnSchema = new mongoose.Schema({
     unique: true,
   },
   columns: [String], // e.g. ["CCTV Camera", "Access Control", "PA Speaker"]
+  columnTotals: { type: Map, of: Number, default: {} }, // expected total qty per device type
 });
 
 const ActiveDevice = mongoose.model('ActiveDevice', ActiveDeviceSchema);

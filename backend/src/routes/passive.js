@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const auth = require('../middleware/auth');
+const adminOnly = require('../middleware/adminOnly');
 const {
   getPassiveItems,
   createPassiveItem,
@@ -11,8 +12,8 @@ const {
 router.use(auth);
 
 router.get('/', getPassiveItems);
-router.post('/', createPassiveItem);
+router.post('/', adminOnly, createPassiveItem);
 router.put('/:itemId', updatePassiveItem);
-router.delete('/:itemId', deletePassiveItem);
+router.delete('/:itemId', adminOnly, deletePassiveItem);
 
 module.exports = router;

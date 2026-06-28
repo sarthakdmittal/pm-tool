@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { Material } from '@/types';
+import { isAdmin } from '@/lib/auth';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
@@ -52,7 +53,16 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<MaterialForm>();
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<MaterialForm>();
+  const admin = isAdmin();
+
+  const [watchedOrderedQty, watchedExecutedQty] = watch(['orderedQty', 'executedQty']);
+
+  useEffect(() => {
+    const ordered = Number(watchedOrderedQty) || 0;
+    const executed = Number(watchedExecutedQty) || 0;
+    setValue('remainingQty', ordered - executed);
+  }, [watchedOrderedQty, watchedExecutedQty, setValue]);
 
   const fetchData = async () => {
     try {
@@ -156,9 +166,11 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
           </Link>
           <h2 className="text-2xl font-bold text-gray-900">Material Status</h2>
         </div>
-        <Button variant="primary" size="sm" onClick={openAdd}>
-          <PlusIcon className="h-4 w-4" /> Add Material
-        </Button>
+        {admin && (
+          <Button variant="primary" size="sm" onClick={openAdd}>
+            <PlusIcon className="h-4 w-4" /> Add Material
+          </Button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -261,13 +273,15 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(m._id)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
-                          title="Delete"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {admin && (
+                          <button
+                            onClick={() => handleDelete(m._id)}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                            title="Delete"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -317,7 +331,15 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
             <Input label="Executed Qty" type="number" min={0} {...register('executedQty')} />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Remaining Qty" type="number" min={0} {...register('remainingQty')} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Remaining Qty <span className="text-xs text-gray-400">(auto)</span></label>
+              <input
+                type="number"
+                readOnly
+                className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600 cursor-not-allowed"
+                {...register('remainingQty')}
+              />
+            </div>
             <Input label="Expected Closure Schedule" {...register('expectedClosureSchedule')} />
           </div>
           <div className="grid grid-cols-2 gap-4">

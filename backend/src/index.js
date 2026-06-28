@@ -15,6 +15,7 @@ const uploadRoutes = require('./routes/upload');
 const activeDeviceRoutes = require('./routes/activeDevices');
 const epbaxRoutes = require('./routes/epbax');
 const passiveRoutes = require('./routes/passive');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use('/api/projects/:id/tasks', taskRoutes);
 app.use('/api/projects/:id/active-devices', activeDeviceRoutes);
 app.use('/api/projects/:id/epbax', epbaxRoutes);
 app.use('/api/projects/:id/passive', passiveRoutes);
+app.use('/api/projects/:id/payments', paymentRoutes);
 app.use('/api/upload', uploadRoutes);
 
 // 404 handler

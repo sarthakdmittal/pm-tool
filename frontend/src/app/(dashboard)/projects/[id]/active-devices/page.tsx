@@ -3,21 +3,31 @@
 import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { isAdmin } from '@/lib/auth';
 import { ActiveDevice } from '@/types';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
+import ProgressBar from '@/components/ui/ProgressBar';
+
+interface DeviceStat {
+  installed: number;
+  expected: number;
+  remaining: number;
+  completionPercent: number;
+}
 
 interface ActiveDeviceResponse {
   entries: ActiveDevice[];
   columns: string[];
+  expectedTotals: Record<string, number>;
   summary: {
     totalLocations: number;
     totalDevicesInstalled: number;
     columnTotals: Record<string, number>;
+    deviceStats: Record<string, DeviceStat>;
   };
 }
 
@@ -32,6 +42,9 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
   const [formQtys, setFormQtys] = useState<Record<string, number>>({});
   const [formArea, setFormArea] = useState('');
   const [formSNo, setFormSNo] = useState<number | ''>('');
+  const [expectedQtys, setExpectedQtys] = useState<Record<string, number>>({});
+  const [isSavingExpected, setIsSavingExpected] = useState(false);
+  const admin = isAdmin();
 
   const fetchData = async () => {
     try {
@@ -39,6 +52,12 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
         `/api/projects/${id}/active-devices`
       );
       setData(res.data);
+      // Initialize expected quantities from server data
+      const initExpected: Record<string, number> = {};
+      (res.data.columns || []).forEach((col) => {
+        initExpected[col] = res.data.expectedTotals?.[col] ?? 0;
+      });
+      setExpectedQtys(initExpected);
     } catch {
       toast.error('Failed to load active devices');
     } finally {
@@ -108,14 +127,29 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (entryId: string) => {
     if (!confirm('Delete this entry?')) return;
     try {
-      await api.delete(`/api/projects/${id}/active-devices/${id}`);
+      await api.delete(`/api/projects/${id}/active-devices/${entryId}`);
       toast.success('Entry deleted');
       fetchData();
     } catch {
       toast.error('Failed to delete');
+    }
+  };
+
+  const handleSaveExpectedTotals = async () => {
+    setIsSavingExpected(true);
+    try {
+      await api.put(`/api/projects/${id}/active-devices/columns`, {
+        columnTotals: expectedQtys,
+      });
+      toast.success('Expected quantities saved');
+      fetchData();
+    } catch {
+      toast.error('Failed to save expected quantities');
+    } finally {
+      setIsSavingExpected(false);
     }
   };
 
@@ -142,10 +176,44 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
           </Link>
           <h2 className="text-2xl font-bold text-gray-900">Active Device Installation</h2>
         </div>
-        <Button variant="primary" size="sm" onClick={openAdd}>
-          <PlusIcon className="h-4 w-4" /> Add Entry
-        </Button>
+        {admin && (
+          <Button variant="primary" size="sm" onClick={openAdd}>
+            <PlusIcon className="h-4 w-4" /> Add Entry
+          </Button>
+        )}
       </div>
+
+      {/* Set Expected Quantities (admin only) */}
+      {admin && columns.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-semibold text-gray-900 mb-3 text-sm">Set Expected Quantities</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Enter the total expected quantity for each device type to track completion %.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+            {columns.map((col) => (
+              <div key={col}>
+                <label className="block text-xs text-gray-600 mb-1">{col} (expected)</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={expectedQtys[col] ?? 0}
+                  onChange={(e) =>
+                    setExpectedQtys((prev) => ({
+                      ...prev,
+                      [col]: Number(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+          <Button variant="primary" size="sm" isLoading={isSavingExpected} onClick={handleSaveExpectedTotals}>
+            Save Expected Quantities
+          </Button>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -159,37 +227,40 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
           <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-            Total Devices Installed
+            Total Installed
           </p>
           <p className="text-3xl font-bold text-blue-600 mt-1">
             {summary?.totalDevicesInstalled ?? 0}
           </p>
         </div>
-        {columns.slice(0, 2).map((col) => (
-          <div key={col} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium truncate">{col}</p>
-            <p className="text-3xl font-bold text-indigo-600 mt-1">
-              {summary?.columnTotals?.[col] ?? 0}
-            </p>
-          </div>
-        ))}
       </div>
 
-      {/* Per-column totals (if more columns) */}
-      {columns.length > 2 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      {/* Per-device type stats */}
+      {columns.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-3">
-            Device Type Totals
+            Device Type Breakdown (Installed / Expected)
           </p>
-          <div className="flex flex-wrap gap-4">
-            {columns.map((col) => (
-              <div key={col} className="text-center min-w-[80px]">
-                <div className="text-xl font-bold text-gray-800">
-                  {summary?.columnTotals?.[col] ?? 0}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {columns.map((col) => {
+              const stat = summary?.deviceStats?.[col];
+              return (
+                <div key={col} className="border border-gray-100 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-700">{col}</span>
+                    <span className="text-sm font-semibold text-indigo-600">
+                      {stat?.completionPercent ?? 0}%
+                    </span>
+                  </div>
+                  <ProgressBar value={stat?.completionPercent ?? 0} size="sm" />
+                  <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                    <span>Installed: <strong>{stat?.installed ?? 0}</strong></span>
+                    <span>Expected: <strong>{stat?.expected ?? 0}</strong></span>
+                    <span>Remaining: <strong>{stat?.remaining ?? 0}</strong></span>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">{col}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -243,12 +314,14 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(entry._id)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {admin && (
+                          <button
+                            onClick={() => handleDelete(entry._id)}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

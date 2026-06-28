@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const adminOnly = require('../middleware/adminOnly');
 const {
   getProjects,
   createProject,
@@ -13,10 +14,10 @@ const {
 router.use(auth);
 
 router.get('/', getProjects);
-router.post('/', createProject);
+router.post('/', adminOnly, createProject);
 router.get('/:id', getProject);
 router.put('/:id', updateProject);
-router.delete('/:id', deleteProject);
+router.delete('/:id', adminOnly, deleteProject);
 router.get('/:id/stats', getProjectStats);
 
 module.exports = router;
