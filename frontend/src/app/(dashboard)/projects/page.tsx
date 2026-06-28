@@ -61,12 +61,14 @@ export default function ProjectsPage() {
           <p className="text-gray-500 mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-3">
-          <Link href="/upload">
-            <Button variant="secondary" size="md">
-              <ArrowUpTrayIcon className="h-4 w-4" />
-              Upload Excel
-            </Button>
-          </Link>
+          {admin && (
+            <Link href="/upload">
+              <Button variant="secondary" size="md">
+                <ArrowUpTrayIcon className="h-4 w-4" />
+                Upload Excel
+              </Button>
+            </Link>
+          )}
           {admin && (
             <Link href="/projects/new">
               <Button variant="primary" size="md">
