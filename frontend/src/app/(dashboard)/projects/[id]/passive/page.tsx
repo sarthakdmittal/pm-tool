@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
@@ -30,7 +30,8 @@ interface PassiveForm {
   remarks: string;
 }
 
-export default function PassivePage({ params }: { params: { id: string } }) {
+export default function PassivePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [data, setData] = useState<PassiveResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,7 +42,7 @@ export default function PassivePage({ params }: { params: { id: string } }) {
 
   const fetchData = async () => {
     try {
-      const res = await api.get<PassiveResponse>(`/api/projects/${params.id}/passive`);
+      const res = await api.get<PassiveResponse>(`/api/projects/${id}/passive`);
       setData(res.data);
     } catch {
       toast.error('Failed to load passive cabling data');
@@ -52,7 +53,7 @@ export default function PassivePage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchData();
-  }, [params.id]);
+  }, [id]);
 
   const openAdd = () => {
     setEditingItem(null);
@@ -77,10 +78,10 @@ export default function PassivePage({ params }: { params: { id: string } }) {
     setIsSaving(true);
     try {
       if (editingItem) {
-        await api.put(`/api/projects/${params.id}/passive/${editingItem._id}`, formData);
+        await api.put(`/api/projects/${id}/passive/${editingItem._id}`, formData);
         toast.success('Item updated');
       } else {
-        await api.post(`/api/projects/${params.id}/passive`, formData);
+        await api.post(`/api/projects/${id}/passive`, formData);
         toast.success('Item added');
       }
       setIsModalOpen(false);
@@ -95,7 +96,7 @@ export default function PassivePage({ params }: { params: { id: string } }) {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this item?')) return;
     try {
-      await api.delete(`/api/projects/${params.id}/passive/${id}`);
+      await api.delete(`/api/projects/${id}/passive/${id}`);
       toast.success('Item deleted');
       fetchData();
     } catch {
@@ -118,7 +119,7 @@ export default function PassivePage({ params }: { params: { id: string } }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/projects/${params.id}`}>
+          <Link href={`/projects/${id}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeftIcon className="h-4 w-4" /> Back
             </Button>

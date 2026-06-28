@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
@@ -21,7 +21,8 @@ interface ActiveDeviceResponse {
   };
 }
 
-export default function ActiveDevicesPage({ params }: { params: { id: string } }) {
+export default function ActiveDevicesPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [data, setData] = useState<ActiveDeviceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,7 +36,7 @@ export default function ActiveDevicesPage({ params }: { params: { id: string } }
   const fetchData = async () => {
     try {
       const res = await api.get<ActiveDeviceResponse>(
-        `/api/projects/${params.id}/active-devices`
+        `/api/projects/${id}/active-devices`
       );
       setData(res.data);
     } catch {
@@ -47,7 +48,7 @@ export default function ActiveDevicesPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     fetchData();
-  }, [params.id]);
+  }, [id]);
 
   const openAdd = () => {
     setEditingEntry(null);
@@ -90,12 +91,12 @@ export default function ActiveDevicesPage({ params }: { params: { id: string } }
 
       if (editingEntry) {
         await api.put(
-          `/api/projects/${params.id}/active-devices/${editingEntry._id}`,
+          `/api/projects/${id}/active-devices/${editingEntry._id}`,
           payload
         );
         toast.success('Entry updated');
       } else {
-        await api.post(`/api/projects/${params.id}/active-devices`, payload);
+        await api.post(`/api/projects/${id}/active-devices`, payload);
         toast.success('Entry added');
       }
       setIsModalOpen(false);
@@ -110,7 +111,7 @@ export default function ActiveDevicesPage({ params }: { params: { id: string } }
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this entry?')) return;
     try {
-      await api.delete(`/api/projects/${params.id}/active-devices/${id}`);
+      await api.delete(`/api/projects/${id}/active-devices/${id}`);
       toast.success('Entry deleted');
       fetchData();
     } catch {
@@ -134,7 +135,7 @@ export default function ActiveDevicesPage({ params }: { params: { id: string } }
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/projects/${params.id}`}>
+          <Link href={`/projects/${id}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeftIcon className="h-4 w-4" /> Back
             </Button>

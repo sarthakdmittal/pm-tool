@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
@@ -25,7 +25,8 @@ interface TaskForm {
   completionPercent: number;
 }
 
-export default function TasksPage({ params }: { params: { id: string } }) {
+export default function TasksPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,8 +40,8 @@ export default function TasksPage({ params }: { params: { id: string } }) {
   const fetchData = async () => {
     try {
       const [taskRes, phaseRes] = await Promise.all([
-        api.get<Task[]>(`/api/projects/${params.id}/tasks`),
-        api.get<Phase[]>(`/api/projects/${params.id}/phases`),
+        api.get<Task[]>(`/api/projects/${id}/tasks`),
+        api.get<Phase[]>(`/api/projects/${id}/phases`),
       ]);
       setTasks(taskRes.data);
       setPhases(phaseRes.data);
@@ -53,7 +54,7 @@ export default function TasksPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchData();
-  }, [params.id]);
+  }, [id]);
 
   const openAdd = () => {
     setEditingTask(null);
@@ -80,10 +81,10 @@ export default function TasksPage({ params }: { params: { id: string } }) {
     setIsSaving(true);
     try {
       if (editingTask) {
-        await api.put(`/api/projects/${params.id}/tasks/${editingTask._id}`, data);
+        await api.put(`/api/projects/${id}/tasks/${editingTask._id}`, data);
         toast.success('Task updated');
       } else {
-        await api.post(`/api/projects/${params.id}/tasks`, data);
+        await api.post(`/api/projects/${id}/tasks`, data);
         toast.success('Task created');
       }
       setIsModalOpen(false);
@@ -95,12 +96,12 @@ export default function TasksPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (taskId: string) => {
     if (!confirm('Delete this task?')) return;
     try {
-      await api.delete(`/api/projects/${params.id}/tasks/${id}`);
+      await api.delete(`/api/projects/${id}/tasks/${taskId}`);
       toast.success('Task deleted');
-      setTasks((prev) => prev.filter((t) => t._id !== id));
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
     } catch {
       toast.error('Failed to delete');
     }
@@ -120,7 +121,7 @@ export default function TasksPage({ params }: { params: { id: string } }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/projects/${params.id}`}>
+          <Link href={`/projects/${id}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeftIcon className="h-4 w-4" /> Back
             </Button>

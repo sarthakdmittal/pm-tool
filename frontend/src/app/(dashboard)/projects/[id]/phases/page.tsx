@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -26,7 +26,8 @@ interface PhaseFormState {
   endDate: string;
 }
 
-export default function PhasesPage({ params }: { params: { id: string } }) {
+export default function PhasesPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [formStates, setFormStates] = useState<Record<string, PhaseFormState>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -35,7 +36,7 @@ export default function PhasesPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const fetchPhases = async () => {
       try {
-        const res = await api.get<Phase[]>(`/api/projects/${params.id}/phases`);
+        const res = await api.get<Phase[]>(`/api/projects/${id}/phases`);
         setPhases(res.data);
         const initial: Record<string, PhaseFormState> = {};
         res.data.forEach((p) => {
@@ -55,7 +56,7 @@ export default function PhasesPage({ params }: { params: { id: string } }) {
       }
     };
     fetchPhases();
-  }, [params.id]);
+  }, [id]);
 
   const handleChange = (phaseId: string, field: keyof PhaseFormState, value: string | number) => {
     setFormStates((prev) => ({
@@ -68,7 +69,7 @@ export default function PhasesPage({ params }: { params: { id: string } }) {
     setSavingId(phaseId);
     try {
       const payload = formStates[phaseId];
-      await api.put(`/api/projects/${params.id}/phases/${phaseId}`, payload);
+      await api.put(`/api/projects/${id}/phases/${phaseId}`, payload);
       toast.success('Phase updated');
       setPhases((prev) =>
         prev.map((p) =>
@@ -95,7 +96,7 @@ export default function PhasesPage({ params }: { params: { id: string } }) {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
-        <Link href={`/projects/${params.id}`}>
+        <Link href={`/projects/${id}`}>
           <Button variant="ghost" size="sm">
             <ArrowLeftIcon className="h-4 w-4" />
             Back

@@ -41,7 +41,8 @@ interface EditForm {
   status: string;
 }
 
-export default function ProjectDetailPage({ params }: { params: { id: string } }) {
+export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [stats, setStats] = useState<ProjectStats | null>(null);
@@ -56,8 +57,8 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const fetchData = async () => {
     try {
       const [projRes, statsRes] = await Promise.all([
-        api.get<Project>(`/api/projects/${params.id}`),
-        api.get<ProjectStats>(`/api/projects/${params.id}/stats`),
+        api.get<Project>(`/api/projects/${id}`),
+        api.get<ProjectStats>(`/api/projects/${id}/stats`),
       ]);
       setProject(projRes.data);
       setStats(statsRes.data);
@@ -81,12 +82,12 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     fetchData();
-  }, [params.id]);
+  }, [id]);
 
   const handleEdit = async (data: EditForm) => {
     setIsSaving(true);
     try {
-      await api.put(`/api/projects/${params.id}`, data);
+      await api.put(`/api/projects/${id}`, data);
       toast.success('Project updated');
       setIsEditOpen(false);
       fetchData();
@@ -100,7 +101,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      await api.delete(`/api/projects/${params.id}`);
+      await api.delete(`/api/projects/${id}`);
       toast.success('Project deleted');
       router.push('/projects');
     } catch {

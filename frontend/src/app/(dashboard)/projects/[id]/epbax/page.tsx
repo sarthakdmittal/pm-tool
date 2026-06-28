@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -47,7 +47,8 @@ function StatusCell({ value }: { value?: string }) {
   );
 }
 
-export default function EPBAXPage({ params }: { params: { id: string } }) {
+export default function EPBAXPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [data, setData] = useState<EPBAXResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,7 +59,7 @@ export default function EPBAXPage({ params }: { params: { id: string } }) {
 
   const fetchData = async () => {
     try {
-      const res = await api.get<EPBAXResponse>(`/api/projects/${params.id}/epbax`);
+      const res = await api.get<EPBAXResponse>(`/api/projects/${id}/epbax`);
       setData(res.data);
     } catch {
       toast.error('Failed to load EPBAX data');
@@ -69,7 +70,7 @@ export default function EPBAXPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchData();
-  }, [params.id]);
+  }, [id]);
 
   const openAdd = () => {
     setEditingItem(null);
@@ -94,10 +95,10 @@ export default function EPBAXPage({ params }: { params: { id: string } }) {
     setIsSaving(true);
     try {
       if (editingItem) {
-        await api.put(`/api/projects/${params.id}/epbax/${editingItem._id}`, formData);
+        await api.put(`/api/projects/${id}/epbax/${editingItem._id}`, formData);
         toast.success('Item updated');
       } else {
-        await api.post(`/api/projects/${params.id}/epbax`, formData);
+        await api.post(`/api/projects/${id}/epbax`, formData);
         toast.success('Item added');
       }
       setIsModalOpen(false);
@@ -112,7 +113,7 @@ export default function EPBAXPage({ params }: { params: { id: string } }) {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this item?')) return;
     try {
-      await api.delete(`/api/projects/${params.id}/epbax/${id}`);
+      await api.delete(`/api/projects/${id}/epbax/${id}`);
       toast.success('Item deleted');
       fetchData();
     } catch {
@@ -135,7 +136,7 @@ export default function EPBAXPage({ params }: { params: { id: string } }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/projects/${params.id}`}>
+          <Link href={`/projects/${id}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeftIcon className="h-4 w-4" /> Back
             </Button>

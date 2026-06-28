@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
@@ -44,7 +44,8 @@ function StatusBadge({ status }: { status?: string }) {
   );
 }
 
-export default function MaterialsPage({ params }: { params: { id: string } }) {
+export default function MaterialsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,7 +56,7 @@ export default function MaterialsPage({ params }: { params: { id: string } }) {
 
   const fetchData = async () => {
     try {
-      const res = await api.get<Material[]>(`/api/projects/${params.id}/materials`);
+      const res = await api.get<Material[]>(`/api/projects/${id}/materials`);
       setMaterials(res.data);
     } catch {
       toast.error('Failed to load materials');
@@ -66,7 +67,7 @@ export default function MaterialsPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchData();
-  }, [params.id]);
+  }, [id]);
 
   const openAdd = () => {
     setEditingMaterial(null);
@@ -101,10 +102,10 @@ export default function MaterialsPage({ params }: { params: { id: string } }) {
     setIsSaving(true);
     try {
       if (editingMaterial) {
-        await api.put(`/api/projects/${params.id}/materials/${editingMaterial._id}`, data);
+        await api.put(`/api/projects/${id}/materials/${editingMaterial._id}`, data);
         toast.success('Material updated');
       } else {
-        await api.post(`/api/projects/${params.id}/materials`, data);
+        await api.post(`/api/projects/${id}/materials`, data);
         toast.success('Material added');
       }
       setIsModalOpen(false);
@@ -116,12 +117,12 @@ export default function MaterialsPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (materialId: string) => {
     if (!confirm('Delete this material?')) return;
     try {
-      await api.delete(`/api/projects/${params.id}/materials/${id}`);
+      await api.delete(`/api/projects/${id}/materials/${materialId}`);
       toast.success('Material deleted');
-      setMaterials((prev) => prev.filter((m) => m._id !== id));
+      setMaterials((prev) => prev.filter((m) => m._id !== materialId));
     } catch {
       toast.error('Failed to delete');
     }
@@ -148,7 +149,7 @@ export default function MaterialsPage({ params }: { params: { id: string } }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/projects/${params.id}`}>
+          <Link href={`/projects/${id}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeftIcon className="h-4 w-4" /> Back
             </Button>
