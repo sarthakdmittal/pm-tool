@@ -18,13 +18,7 @@ import {
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import { cx } from '@/lib/utils';
-
-const navLinks = [
-  { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-  { href: '/projects', label: 'Projects', icon: FolderIcon },
-  { href: '/upload', label: 'Upload Excel', icon: ArrowUpTrayIcon },
-  { href: '/settings', label: 'Settings & Users', icon: Cog6ToothIcon },
-];
+import { isAdmin } from '@/lib/auth';
 
 function getProjectId(pathname: string): string | null {
   const match = pathname.match(/^\/projects\/([^/]+)/);
@@ -33,6 +27,14 @@ function getProjectId(pathname: string): string | null {
 
 const Sidebar: React.FC = () => {
   const pathname = usePathname();
+  const admin = isAdmin();
+
+  const navLinks = [
+    { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
+    { href: '/projects', label: 'Projects', icon: FolderIcon },
+    ...(admin ? [{ href: '/upload', label: 'Upload Excel', icon: ArrowUpTrayIcon }] : []),
+    { href: '/settings', label: 'Settings & Users', icon: Cog6ToothIcon },
+  ];
   const projectId = getProjectId(pathname);
   const isOnProject = Boolean(projectId);
 
