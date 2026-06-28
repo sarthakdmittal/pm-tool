@@ -6,11 +6,11 @@ const ActiveDeviceSchema = new mongoose.Schema(
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
     sNo: Number,
     areaLocation: { type: String, required: true },
-    // Dynamic device items — store as array of {itemName, quantity}
     deviceItems: [
       {
         itemName: String,
-        quantity: { type: Number, default: 0 },
+        installed: { type: Number, default: 0 },
+        remaining: { type: Number, default: 0 },
       },
     ],
   },

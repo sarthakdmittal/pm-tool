@@ -9,12 +9,10 @@ import { isAdmin } from '@/lib/auth';
 import { ActiveDevice } from '@/types';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Input from '@/components/ui/Input';
 import ProgressBar from '@/components/ui/ProgressBar';
 
 interface DeviceStat {
   installed: number;
-  expected: number;
   remaining: number;
   completionPercent: number;
 }
@@ -22,7 +20,6 @@ interface DeviceStat {
 interface ActiveDeviceResponse {
   entries: ActiveDevice[];
   columns: string[];
-  expectedTotals: Record<string, number>;
   summary: {
     totalLocations: number;
     totalDevicesInstalled: number;
@@ -38,26 +35,17 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<ActiveDevice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  // Form state for device quantities per column
-  const [formQtys, setFormQtys] = useState<Record<string, number>>({});
   const [formArea, setFormArea] = useState('');
   const [formSNo, setFormSNo] = useState<number | ''>('');
-  const [expectedQtys, setExpectedQtys] = useState<Record<string, number>>({});
-  const [isSavingExpected, setIsSavingExpected] = useState(false);
+  // Per-device: installed and remaining
+  const [formInstalled, setFormInstalled] = useState<Record<string, number>>({});
+  const [formRemaining, setFormRemaining] = useState<Record<string, number>>({});
   const admin = isAdmin();
 
   const fetchData = async () => {
     try {
-      const res = await api.get<ActiveDeviceResponse>(
-        `/api/projects/${id}/active-devices`
-      );
+      const res = await api.get<ActiveDeviceResponse>(`/api/projects/${id}/active-devices`);
       setData(res.data);
-      // Initialize expected quantities from server data
-      const initExpected: Record<string, number> = {};
-      (res.data.columns || []).forEach((col) => {
-        initExpected[col] = res.data.expectedTotals?.[col] ?? 0;
-      });
-      setExpectedQtys(initExpected);
     } catch {
       toast.error('Failed to load active devices');
     } finally {
@@ -65,17 +53,28 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
+  useEffect(() => { fetchData(); }, [id]);
+
+  const initForm = (entry?: ActiveDevice) => {
+    const cols = data?.columns || [];
+    const installed: Record<string, number> = {};
+    const remaining: Record<string, number> = {};
+    cols.forEach((col) => { installed[col] = 0; remaining[col] = 0; });
+    if (entry) {
+      entry.deviceItems.forEach((item) => {
+        installed[item.itemName] = (item as any).installed ?? (item as any).quantity ?? 0;
+        remaining[item.itemName] = (item as any).remaining ?? 0;
+      });
+    }
+    setFormInstalled(installed);
+    setFormRemaining(remaining);
+  };
 
   const openAdd = () => {
     setEditingEntry(null);
     setFormArea('');
     setFormSNo('');
-    const qtys: Record<string, number> = {};
-    (data?.columns || []).forEach((col) => { qtys[col] = 0; });
-    setFormQtys(qtys);
+    initForm();
     setIsModalOpen(true);
   };
 
@@ -83,24 +82,19 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
     setEditingEntry(entry);
     setFormArea(entry.areaLocation);
     setFormSNo(entry.sNo ?? '');
-    const qtys: Record<string, number> = {};
-    (data?.columns || []).forEach((col) => { qtys[col] = 0; });
-    entry.deviceItems.forEach((item) => { qtys[item.itemName] = item.quantity; });
-    setFormQtys(qtys);
+    initForm(entry);
     setIsModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!formArea.trim()) {
-      toast.error('Area/Location is required');
-      return;
-    }
+    if (!formArea.trim()) { toast.error('Area/Location is required'); return; }
     setIsSaving(true);
     try {
       const columns = data?.columns || [];
       const deviceItems = columns.map((col) => ({
         itemName: col,
-        quantity: Number(formQtys[col]) || 0,
+        installed: Number(formInstalled[col]) || 0,
+        remaining: Number(formRemaining[col]) || 0,
       }));
       const payload = {
         sNo: formSNo !== '' ? Number(formSNo) : undefined,
@@ -109,10 +103,7 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
       };
 
       if (editingEntry) {
-        await api.put(
-          `/api/projects/${id}/active-devices/${editingEntry._id}`,
-          payload
-        );
+        await api.put(`/api/projects/${id}/active-devices/${editingEntry._id}`, payload);
         toast.success('Entry updated');
       } else {
         await api.post(`/api/projects/${id}/active-devices`, payload);
@@ -135,21 +126,6 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
       fetchData();
     } catch {
       toast.error('Failed to delete');
-    }
-  };
-
-  const handleSaveExpectedTotals = async () => {
-    setIsSavingExpected(true);
-    try {
-      await api.put(`/api/projects/${id}/active-devices/columns`, {
-        columnTotals: expectedQtys,
-      });
-      toast.success('Expected quantities saved');
-      fetchData();
-    } catch {
-      toast.error('Failed to save expected quantities');
-    } finally {
-      setIsSavingExpected(false);
     }
   };
 
@@ -183,55 +159,15 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* Set Expected Quantities (admin only) */}
-      {admin && columns.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h3 className="font-semibold text-gray-900 mb-3 text-sm">Set Expected Quantities</h3>
-          <p className="text-xs text-gray-500 mb-3">
-            Enter the total expected quantity for each device type to track completion %.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
-            {columns.map((col) => (
-              <div key={col}>
-                <label className="block text-xs text-gray-600 mb-1">{col} (expected)</label>
-                <input
-                  type="number"
-                  min={0}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={expectedQtys[col] ?? 0}
-                  onChange={(e) =>
-                    setExpectedQtys((prev) => ({
-                      ...prev,
-                      [col]: Number(e.target.value) || 0,
-                    }))
-                  }
-                />
-              </div>
-            ))}
-          </div>
-          <Button variant="primary" size="sm" isLoading={isSavingExpected} onClick={handleSaveExpectedTotals}>
-            Save Expected Quantities
-          </Button>
-        </div>
-      )}
-
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 max-w-sm">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-            Total Locations
-          </p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">
-            {summary?.totalLocations ?? 0}
-          </p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Locations</p>
+          <p className="text-3xl font-bold text-gray-900 mt-1">{summary?.totalLocations ?? 0}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-            Total Installed
-          </p>
-          <p className="text-3xl font-bold text-blue-600 mt-1">
-            {summary?.totalDevicesInstalled ?? 0}
-          </p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Total Installed</p>
+          <p className="text-3xl font-bold text-blue-600 mt-1">{summary?.totalDevicesInstalled ?? 0}</p>
         </div>
       </div>
 
@@ -239,7 +175,7 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
       {columns.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-3">
-            Device Type Breakdown (Installed / Expected)
+            Device Type Breakdown
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {columns.map((col) => {
@@ -255,7 +191,6 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
                   <ProgressBar value={stat?.completionPercent ?? 0} size="sm" />
                   <div className="flex gap-4 mt-1 text-xs text-gray-500">
                     <span>Installed: <strong>{stat?.installed ?? 0}</strong></span>
-                    <span>Expected: <strong>{stat?.expected ?? 0}</strong></span>
                     <span>Remaining: <strong>{stat?.remaining ?? 0}</strong></span>
                   </div>
                 </div>
@@ -274,20 +209,29 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
                 <th className="px-3 py-3 font-medium">S.No</th>
                 <th className="px-3 py-3 font-medium">Area / Location</th>
                 {columns.map((col) => (
-                  <th key={col} className="px-3 py-3 font-medium text-right whitespace-nowrap">
+                  <th key={col} className="px-3 py-3 font-medium text-center whitespace-nowrap" colSpan={2}>
                     {col}
                   </th>
                 ))}
                 <th className="px-3 py-3 font-medium">Actions</th>
               </tr>
+              {columns.length > 0 && (
+                <tr className="text-xs text-gray-400 bg-gray-50 border-b border-gray-100">
+                  <th colSpan={2} />
+                  {columns.map((col) => (
+                    <React.Fragment key={col}>
+                      <th className="px-3 py-1 font-medium text-center text-green-600">Installed</th>
+                      <th className="px-3 py-1 font-medium text-center text-orange-500">Remaining</th>
+                    </React.Fragment>
+                  ))}
+                  <th />
+                </tr>
+              )}
             </thead>
             <tbody className="divide-y divide-gray-50">
               {entries.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={3 + columns.length}
-                    className="px-4 py-12 text-center text-gray-400"
-                  >
+                  <td colSpan={3 + columns.length * 2} className="px-4 py-12 text-center text-gray-400">
                     No entries yet
                   </td>
                 </tr>
@@ -295,15 +239,18 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
                 entries.map((entry) => (
                   <tr key={entry._id} className="hover:bg-gray-50">
                     <td className="px-3 py-2.5 text-gray-500 text-xs">{entry.sNo ?? '—'}</td>
-                    <td className="px-3 py-2.5 font-medium text-gray-900">
-                      {entry.areaLocation}
-                    </td>
+                    <td className="px-3 py-2.5 font-medium text-gray-900">{entry.areaLocation}</td>
                     {columns.map((col) => {
                       const item = entry.deviceItems.find((d) => d.itemName === col);
                       return (
-                        <td key={col} className="px-3 py-2.5 text-right text-gray-600">
-                          {item ? item.quantity : 0}
-                        </td>
+                        <React.Fragment key={col}>
+                          <td className="px-3 py-2.5 text-center text-green-700 font-medium">
+                            {(item as any)?.installed ?? (item as any)?.quantity ?? 0}
+                          </td>
+                          <td className="px-3 py-2.5 text-center text-orange-600 font-medium">
+                            {(item as any)?.remaining ?? 0}
+                          </td>
+                        </React.Fragment>
                       );
                     })}
                     <td className="px-3 py-2.5">
@@ -328,21 +275,6 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
                 ))
               )}
             </tbody>
-            {entries.length > 0 && columns.length > 0 && (
-              <tfoot className="bg-gray-50 border-t border-gray-200">
-                <tr className="font-semibold text-gray-800 text-sm">
-                  <td className="px-3 py-3" colSpan={2}>
-                    TOTAL
-                  </td>
-                  {columns.map((col) => (
-                    <td key={col} className="px-3 py-3 text-right">
-                      {summary?.columnTotals?.[col] ?? 0}
-                    </td>
-                  ))}
-                  <td />
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
       </div>
@@ -366,9 +298,7 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Area / Location *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Area / Location *</label>
               <input
                 type="text"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -381,42 +311,47 @@ export default function ActiveDevicesPage({ params }: { params: Promise<{ id: st
           {columns.length > 0 && (
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">Device Quantities</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 {columns.map((col) => (
-                  <div key={col}>
-                    <label className="block text-xs text-gray-600 mb-1">{col}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={formQtys[col] ?? 0}
-                      onChange={(e) =>
-                        setFormQtys((prev) => ({
-                          ...prev,
-                          [col]: Number(e.target.value) || 0,
-                        }))
-                      }
-                    />
+                  <div key={col} className="border border-gray-100 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-gray-600 mb-2">{col}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-green-700 font-medium mb-1">Installed</label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                          value={formInstalled[col] ?? 0}
+                          onChange={(e) =>
+                            setFormInstalled((prev) => ({ ...prev, [col]: Number(e.target.value) || 0 }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-orange-600 font-medium mb-1">Remaining</label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          value={formRemaining[col] ?? 0}
+                          onChange={(e) =>
+                            setFormRemaining((prev) => ({ ...prev, [col]: Number(e.target.value) || 0 }))
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {columns.length === 0 && (
-            <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
-              No device columns configured for this project. Upload an Excel file first, or add
-              columns via the API.
-            </p>
-          )}
-
           <div className="flex gap-3 pt-2">
             <Button variant="primary" isLoading={isSaving} onClick={handleSave}>
               {editingEntry ? 'Update' : 'Add Entry'}
             </Button>
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
           </div>
         </div>
       </Modal>

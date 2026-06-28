@@ -12,41 +12,37 @@ const getActiveDevices = async (req, res, next) => {
     ]);
 
     const columns = columnDoc ? columnDoc.columns : [];
-    const expectedTotals = columnDoc && columnDoc.columnTotals ? Object.fromEntries(columnDoc.columnTotals) : {};
 
-    // Build summary: total devices installed per column
+    // Sum installed and remaining per column across all entries
     const installedTotals = {};
-    columns.forEach((col) => { installedTotals[col] = 0; });
+    const remainingTotals = {};
+    columns.forEach((col) => { installedTotals[col] = 0; remainingTotals[col] = 0; });
     entries.forEach((entry) => {
       entry.deviceItems.forEach((item) => {
-        if (installedTotals[item.itemName] !== undefined) {
-          installedTotals[item.itemName] += item.quantity;
-        } else {
-          installedTotals[item.itemName] = (installedTotals[item.itemName] || 0) + item.quantity;
-        }
+        installedTotals[item.itemName] = (installedTotals[item.itemName] || 0) + (item.installed || 0);
+        remainingTotals[item.itemName] = (remainingTotals[item.itemName] || 0) + (item.remaining || 0);
       });
     });
 
     const totalDevicesInstalled = Object.values(installedTotals).reduce((a, b) => a + b, 0);
     const totalLocations = entries.length;
 
-    // Build per-device completion stats
+    // Per-device stats
     const deviceStats = {};
     columns.forEach((col) => {
       const installed = installedTotals[col] || 0;
-      const expected = expectedTotals[col] || 0;
+      const remaining = remainingTotals[col] || 0;
+      const total = installed + remaining;
       deviceStats[col] = {
         installed,
-        expected,
-        remaining: Math.max(0, expected - installed),
-        completionPercent: expected > 0 ? Math.min(100, Math.round((installed / expected) * 100)) : 0,
+        remaining,
+        completionPercent: total > 0 ? Math.min(100, Math.round((installed / total) * 100)) : 0,
       };
     });
 
     res.json({
       entries,
       columns,
-      expectedTotals,
       summary: {
         totalLocations,
         totalDevicesInstalled,
