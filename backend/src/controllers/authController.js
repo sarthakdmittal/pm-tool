@@ -91,4 +91,46 @@ const me = async (req, res) => {
   });
 };
 
-module.exports = { register, login, me };
+// One-time setup: promote current user to admin if no admin exists yet
+const claimAdmin = async (req, res, next) => {
+  try {
+    const adminExists = await User.findOne({ role: 'admin' });
+    if (adminExists) {
+      return res.status(403).json({ message: 'An admin already exists. Ask them to grant you admin access.' });
+    }
+    const user = await User.findByIdAndUpdate(req.user._id, { role: 'admin' }, { new: true });
+    res.json({ message: 'You are now an admin.', user: { _id: user._id, name: user.name, email: user.email, role: user.role } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Admin: list all users
+const getUsers = async (req, res, next) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Admin: change a user's role
+const updateUserRole = async (req, res, next) => {
+  try {
+    const { role } = req.body;
+    if (!['admin', 'member'].includes(role)) {
+      return res.status(400).json({ message: 'Role must be admin or member' });
+    }
+    if (req.params.userId === req.user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot change your own role' });
+    }
+    const user = await User.findByIdAndUpdate(req.params.userId, { role }, { new: true }).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { register, login, me, claimAdmin, getUsers, updateUserRole };
