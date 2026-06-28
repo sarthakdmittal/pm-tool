@@ -218,7 +218,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Phase Progress */}
       {stats.phases.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Phase Progress</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900">Phase Progress</h3>
+            <Link href={`/projects/${id}/phases`} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              Edit Phases →
+            </Link>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {stats.phases.map((phase) => (
               <PhaseProgress key={phase._id} phase={phase} />

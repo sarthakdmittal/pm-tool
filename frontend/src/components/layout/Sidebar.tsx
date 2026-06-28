@@ -13,6 +13,7 @@ import {
   PhoneIcon,
   WifiIcon,
   CheckCircleIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { cx } from '@/lib/utils';
 
@@ -39,6 +40,12 @@ const Sidebar: React.FC = () => {
           label: 'Overview',
           icon: Squares2X2Icon,
           exact: true,
+        },
+        {
+          href: `/projects/${projectId}/phases`,
+          label: 'Phases',
+          icon: ChartBarIcon,
+          exact: false,
         },
         {
           href: `/projects/${projectId}/materials`,
@@ -86,7 +93,7 @@ const Sidebar: React.FC = () => {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         {navLinks.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/'));
+          const isActive = pathname === href || (href === '/upload' && pathname.startsWith('/upload'));
           return (
             <Link
               key={href}
