@@ -358,26 +358,32 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 {activeDeviceStats?.totalDevicesInstalled ?? 0} total devices
               </span>
             </div>
-            {(activeDeviceStats?.activeDeviceCompletionPercent ?? 0) > 0 && (
-              <div className="mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-500">Installation Progress</span>
-                  <span className="text-xs font-semibold text-purple-600">
-                    {activeDeviceStats?.activeDeviceCompletionPercent ?? 0}%
-                  </span>
-                </div>
-                <ProgressBar value={activeDeviceStats?.activeDeviceCompletionPercent ?? 0} size="sm" />
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-gray-500">Overall Installation Progress</span>
+                <span className="text-xs font-semibold text-purple-600">
+                  {activeDeviceStats?.activeDeviceCompletionPercent ?? 0}%
+                </span>
               </div>
-            )}
-            <div className="flex flex-wrap gap-4">
-              {(activeDeviceStats?.columns ?? []).map((col) => (
-                <div key={col} className="text-center min-w-[60px]">
-                  <div className="text-xl font-bold text-gray-800">
-                    {activeDeviceStats?.columnTotals?.[col] ?? 0}
+              <ProgressBar value={activeDeviceStats?.activeDeviceCompletionPercent ?? 0} size="sm" />
+            </div>
+            <div className="space-y-2">
+              {(activeDeviceStats?.columns ?? []).map((col) => {
+                const stat = activeDeviceStats?.deviceStats?.[col];
+                return (
+                  <div key={col}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs text-gray-600">{col}</span>
+                      <span className="text-xs font-semibold text-indigo-600">{stat?.completionPercent ?? 0}%</span>
+                    </div>
+                    <ProgressBar value={stat?.completionPercent ?? 0} size="sm" />
+                    <div className="flex gap-3 mt-0.5 text-xs text-gray-400">
+                      <span>Installed: <strong className="text-green-600">{stat?.installed ?? 0}</strong></span>
+                      <span>Remaining: <strong className="text-orange-500">{stat?.remaining ?? 0}</strong></span>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">{col}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </Link>

@@ -139,12 +139,18 @@ export interface EPBAXStats {
   handedOverCount: number;
 }
 
+export interface DeviceTypeStat {
+  installed: number;
+  remaining: number;
+  completionPercent: number;
+}
+
 export interface ActiveDeviceStats {
   totalLocations: number;
   totalDevicesInstalled: number;
   columns: string[];
   columnTotals: Record<string, number>;
-  expectedTotals?: Record<string, number>;
+  deviceStats: Record<string, DeviceTypeStat>;
   activeDeviceCompletionPercent?: number;
 }
 

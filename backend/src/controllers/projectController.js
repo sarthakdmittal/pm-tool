@@ -237,28 +237,42 @@ const getProjectStats = async (req, res, next) => {
       ).length,
     };
 
-    // Active device column totals
+    // Active device stats — installed + remaining per device type
     const columns = columnDoc ? columnDoc.columns : [];
-    const expectedTotalsMap = columnDoc && columnDoc.columnTotals ? Object.fromEntries(columnDoc.columnTotals) : {};
-    const columnTotals = {};
-    columns.forEach((col) => { columnTotals[col] = 0; });
+    const installedTotals = {};
+    const remainingTotals = {};
+    columns.forEach((col) => { installedTotals[col] = 0; remainingTotals[col] = 0; });
     activeDevices.forEach((entry) => {
       entry.deviceItems.forEach((item) => {
-        columnTotals[item.itemName] = (columnTotals[item.itemName] || 0) + item.quantity;
+        installedTotals[item.itemName] = (installedTotals[item.itemName] || 0) + (item.installed || 0);
+        remainingTotals[item.itemName] = (remainingTotals[item.itemName] || 0) + (item.remaining || 0);
       });
     });
-    const totalDevicesInstalled = Object.values(columnTotals).reduce((a, b) => a + b, 0);
-    const totalExpected = Object.values(expectedTotalsMap).reduce((a, b) => a + b, 0);
-    const activeDeviceCompletionPercent = totalExpected > 0
-      ? Math.min(100, Math.round((totalDevicesInstalled / totalExpected) * 100))
+    const totalDevicesInstalled = Object.values(installedTotals).reduce((a, b) => a + b, 0);
+    const totalDevicesRemaining = Object.values(remainingTotals).reduce((a, b) => a + b, 0);
+    const grandTotal = totalDevicesInstalled + totalDevicesRemaining;
+    const activeDeviceCompletionPercent = grandTotal > 0
+      ? Math.min(100, Math.round((totalDevicesInstalled / grandTotal) * 100))
       : 0;
+
+    const deviceStats = {};
+    columns.forEach((col) => {
+      const inst = installedTotals[col] || 0;
+      const rem = remainingTotals[col] || 0;
+      const tot = inst + rem;
+      deviceStats[col] = {
+        installed: inst,
+        remaining: rem,
+        completionPercent: tot > 0 ? Math.min(100, Math.round((inst / tot) * 100)) : 0,
+      };
+    });
 
     const activeDeviceStats = {
       totalLocations: activeDevices.length,
       totalDevicesInstalled,
       columns,
-      columnTotals,
-      expectedTotals: expectedTotalsMap,
+      columnTotals: installedTotals,
+      deviceStats,
       activeDeviceCompletionPercent,
     };
 
