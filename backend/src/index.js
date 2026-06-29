@@ -83,21 +83,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 
-  // Ping self every 10 minutes to prevent Render free tier from sleeping
-  if (process.env.BACKEND_URL) {
-    const https = require('https');
-    const http = require('http');
-    setInterval(() => {
-      const url = process.env.BACKEND_URL + '/health';
-      const client = url.startsWith('https') ? https : http;
-      client.get(url, (res) => {
-        console.log(`[keep-alive] ping ${url} → ${res.statusCode}`);
-      }).on('error', (err) => {
-        console.error('[keep-alive] ping failed:', err.message);
-      });
-    }, 10 * 60 * 1000);
-  }
-
   // Daily cron: 9 AM — auto-notify overdue tasks if email is configured
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     cron.schedule('0 9 * * *', async () => {
