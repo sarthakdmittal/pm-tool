@@ -361,7 +361,18 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                 ))}
               </select>
             </div>
-            <Input label="Assigned To" placeholder="Team member name" {...register('assignedTo')} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+              <select
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {...register('assignedTo')}
+              >
+                <option value="">— Unassigned —</option>
+                {allUsers.map((u) => (
+                  <option key={u.email} value={u.name}>{u.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label="Start Date" type="date" {...register('startDate')} />
