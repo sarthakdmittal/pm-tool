@@ -86,9 +86,34 @@ const me = async (req, res) => {
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
+      phone: req.user.phone || null,
       createdAt: req.user.createdAt,
     },
   });
+};
+
+// PUT /me — update own profile (name, phone)
+const updateMe = async (req, res, next) => {
+  try {
+    const { name, phone } = req.body;
+    const updates = {};
+    if (name) updates.name = name.trim();
+    if (phone !== undefined) updates.phone = phone.trim() || null;
+
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select('-password');
+    res.json({
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone || null,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // One-time setup: promote current user to admin if no admin exists yet
@@ -133,4 +158,4 @@ const updateUserRole = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, me, claimAdmin, getUsers, updateUserRole };
+module.exports = { register, login, me, updateMe, claimAdmin, getUsers, updateUserRole };

@@ -2,7 +2,9 @@
 
 import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowLeftIcon, PlusIcon, TrashIcon, PencilIcon, BellIcon,
+} from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
@@ -26,6 +28,15 @@ interface TaskForm {
   completionPercent: number;
 }
 
+interface NotifyForm {
+  email: string;
+  phone: string;
+  channel: 'email' | 'whatsapp' | 'both';
+  customMessage: string;
+}
+
+interface NotifConfig { email: boolean; whatsapp: boolean; }
+
 export default function TasksPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -35,6 +46,13 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Notification state
+  const [notifConfig, setNotifConfig] = useState<NotifConfig>({ email: false, whatsapp: false });
+  const [notifyTask, setNotifyTask] = useState<Task | null>(null);
+  const [notifyForm, setNotifyForm] = useState<NotifyForm>({ email: '', phone: '', channel: 'email', customMessage: '' });
+  const [isSendingNotif, setIsSendingNotif] = useState(false);
+  const [isNotifyingOverdue, setIsNotifyingOverdue] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskForm>();
   const admin = isAdmin();
@@ -56,6 +74,8 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   useEffect(() => {
     fetchData();
+    // Check which notification channels are configured
+    api.get<NotifConfig>('/api/notifications/config').then((r) => setNotifConfig(r.data)).catch(() => {});
   }, [id]);
 
   const openAdd = () => {
@@ -109,7 +129,53 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     }
   };
 
+  const openNotify = (task: Task) => {
+    setNotifyTask(task);
+    setNotifyForm({ email: '', phone: '', channel: notifConfig.email ? 'email' : 'whatsapp', customMessage: '' });
+  };
+
+  const handleSendNotification = async () => {
+    if (!notifyTask) return;
+    if (!notifyForm.email && !notifyForm.phone) {
+      toast.error('Enter at least one recipient (email or phone)');
+      return;
+    }
+    setIsSendingNotif(true);
+    try {
+      const res = await api.post<{ message: string; errors: string[] }>(
+        `/api/projects/${id}/tasks/${notifyTask._id}/notify`,
+        notifyForm
+      );
+      toast.success(res.data.message);
+      if (res.data.errors?.length) toast.error(res.data.errors.join('; '));
+      setNotifyTask(null);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Notification failed';
+      toast.error(msg);
+    } finally {
+      setIsSendingNotif(false);
+    }
+  };
+
+  const handleNotifyOverdue = async () => {
+    if (!confirm('Send notifications to all overdue task assignees?')) return;
+    setIsNotifyingOverdue(true);
+    try {
+      const res = await api.post<{ message: string }>(`/api/projects/${id}/notify-overdue`, {
+        channel: notifConfig.email && notifConfig.whatsapp ? 'both' : notifConfig.email ? 'email' : 'whatsapp',
+      });
+      toast.success(res.data.message);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed';
+      toast.error(msg);
+    } finally {
+      setIsNotifyingOverdue(false);
+    }
+  };
+
   const filtered = phaseFilter ? tasks.filter((t) => t.phaseName === phaseFilter) : tasks;
+  const overdueCount = tasks.filter((t) => t.status === 'overdue').length;
+  const notifEnabled = notifConfig.email || notifConfig.whatsapp;
 
   if (isLoading) {
     return (
@@ -121,7 +187,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Link href={`/projects/${id}`}>
             <Button variant="ghost" size="sm">
@@ -131,21 +197,40 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           <h2 className="text-2xl font-bold text-gray-900">Tasks</h2>
           <span className="text-sm text-gray-500">({tasks.length} total)</span>
         </div>
-        {admin && (
-          <Button variant="primary" size="sm" onClick={openAdd}>
-            <PlusIcon className="h-4 w-4" /> Add Task
-          </Button>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          {admin && notifEnabled && overdueCount > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              isLoading={isNotifyingOverdue}
+              onClick={handleNotifyOverdue}
+            >
+              <BellIcon className="h-4 w-4 text-orange-500" />
+              Notify Overdue ({overdueCount})
+            </Button>
+          )}
+          {admin && (
+            <Button variant="primary" size="sm" onClick={openAdd}>
+              <PlusIcon className="h-4 w-4" /> Add Task
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Notification channel warning (admin only) */}
+      {admin && !notifEnabled && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
+          Notifications are not configured. Add <strong>EMAIL_USER</strong> / <strong>EMAIL_PASS</strong> or
+          WhatsApp env vars on Render to enable task alerts.
+        </div>
+      )}
 
       {/* Phase Filter */}
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setPhaseFilter('')}
-          className={cx(
-            'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-            phaseFilter === '' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          )}
+          className={cx('px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+            phaseFilter === '' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
         >
           All Phases
         </button>
@@ -153,12 +238,8 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           <button
             key={p._id}
             onClick={() => setPhaseFilter(p.phaseName)}
-            className={cx(
-              'px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors',
-              phaseFilter === p.phaseName
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            )}
+            className={cx('px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors',
+              phaseFilter === p.phaseName ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
           >
             {p.phaseName}
           </button>
@@ -185,43 +266,29 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-gray-400">
-                    No tasks found
-                  </td>
+                  <td colSpan={9} className="px-4 py-12 text-center text-gray-400">No tasks found</td>
                 </tr>
               ) : (
                 filtered.map((task) => (
                   <tr
                     key={task._id}
-                    className={cx(
-                      'hover:bg-gray-50 transition-colors',
-                      task.status === 'overdue' && 'bg-red-50 hover:bg-red-50'
-                    )}
+                    className={cx('hover:bg-gray-50 transition-colors',
+                      task.status === 'overdue' && 'bg-red-50 hover:bg-red-50')}
                   >
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{task.name}</p>
                       {task.description && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">
-                          {task.description}
-                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">{task.description}</p>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       {task.phaseName ? <Badge status={task.phaseName} /> : <span className="text-gray-400">—</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{task.assignedTo || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {task.startDate ? formatDate(task.startDate) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {task.dueDate ? formatDate(task.dueDate) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {task.completedDate ? formatDate(task.completedDate) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={task.status} />
-                    </td>
+                    <td className="px-4 py-3 text-gray-600">{task.startDate ? formatDate(task.startDate) : '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{task.dueDate ? formatDate(task.dueDate) : '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{task.completedDate ? formatDate(task.completedDate) : '—'}</td>
+                    <td className="px-4 py-3"><Badge status={task.status} /></td>
                     <td className="px-4 py-3 w-32">
                       <div className="flex items-center gap-2">
                         <ProgressBar value={task.completionPercent} size="sm" className="flex-1" />
@@ -233,13 +300,24 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         <button
                           onClick={() => openEdit(task)}
                           className="p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
+                          title="Edit"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
+                        {admin && notifEnabled && (
+                          <button
+                            onClick={() => openNotify(task)}
+                            className="p-1.5 hover:bg-amber-50 rounded-lg text-amber-500 transition-colors"
+                            title="Send notification"
+                          >
+                            <BellIcon className="h-4 w-4" />
+                          </button>
+                        )}
                         {admin && (
                           <button
                             onClick={() => handleDelete(task._id)}
                             className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                            title="Delete"
                           >
                             <TrashIcon className="h-4 w-4" />
                           </button>
@@ -255,31 +333,17 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
       </div>
 
       {/* Add/Edit Task Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingTask ? 'Edit Task' : 'Add Task'}
-        size="lg"
-      >
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingTask ? 'Edit Task' : 'Add Task'} size="lg">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input
-            label="Task Name *"
-            error={errors.name?.message}
-            {...register('name', { required: 'Required' })}
-          />
+          <Input label="Task Name *" error={errors.name?.message} {...register('name', { required: 'Required' })} />
           <Input label="Description" {...register('description')} />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phase</label>
-              <select
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                {...register('phaseName')}
-              >
+              <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" {...register('phaseName')}>
                 <option value="">— No Phase —</option>
                 {phases.map((p) => (
-                  <option key={p._id} value={p.phaseName}>
-                    {p.phaseName.charAt(0).toUpperCase() + p.phaseName.slice(1)}
-                  </option>
+                  <option key={p._id} value={p.phaseName}>{p.phaseName.charAt(0).toUpperCase() + p.phaseName.slice(1)}</option>
                 ))}
               </select>
             </div>
@@ -292,33 +356,103 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                {...register('status')}
-              >
+              <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" {...register('status')}>
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
                 <option value="done">Done</option>
                 <option value="overdue">Overdue</option>
               </select>
             </div>
-            <Input
-              label="Completion %"
-              type="number"
-              min={0}
-              max={100}
-              {...register('completionPercent')}
-            />
+            <Input label="Completion %" type="number" min={0} max={100} {...register('completionPercent')} />
           </div>
           <div className="flex gap-3 pt-2">
-            <Button type="submit" variant="primary" isLoading={isSaving}>
-              {editingTask ? 'Update Task' : 'Add Task'}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
+            <Button type="submit" variant="primary" isLoading={isSaving}>{editingTask ? 'Update Task' : 'Add Task'}</Button>
+            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Notification Modal */}
+      <Modal isOpen={!!notifyTask} onClose={() => setNotifyTask(null)} title="Send Task Notification" size="md">
+        {notifyTask && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <p className="font-medium text-gray-800">{notifyTask.name}</p>
+              <div className="flex gap-3 mt-1 text-gray-500 text-xs">
+                <Badge status={notifyTask.status} />
+                {notifyTask.assignedTo && <span>Assigned: {notifyTask.assignedTo}</span>}
+                {notifyTask.dueDate && <span>Due: {formatDate(notifyTask.dueDate)}</span>}
+              </div>
+            </div>
+
+            {/* Channel selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Send via</label>
+              <div className="flex gap-2">
+                {notifConfig.email && (
+                  <button
+                    onClick={() => setNotifyForm((f) => ({ ...f, channel: notifConfig.whatsapp ? (f.channel === 'email' ? 'email' : f.channel === 'whatsapp' ? 'whatsapp' : 'both') : 'email' }))}
+                    className={cx('flex-1 py-2 rounded-lg border text-sm font-medium transition-colors',
+                      (notifyForm.channel === 'email' || notifyForm.channel === 'both') ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}
+                    onClick={() => setNotifyForm((f) => ({ ...f, channel: f.channel === 'whatsapp' ? 'both' : f.channel === 'both' ? 'whatsapp' : 'email' }))}
+                  >
+                    Email
+                  </button>
+                )}
+                {notifConfig.whatsapp && (
+                  <button
+                    className={cx('flex-1 py-2 rounded-lg border text-sm font-medium transition-colors',
+                      (notifyForm.channel === 'whatsapp' || notifyForm.channel === 'both') ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}
+                    onClick={() => setNotifyForm((f) => ({ ...f, channel: f.channel === 'email' ? 'both' : f.channel === 'both' ? 'email' : 'whatsapp' }))}
+                  >
+                    WhatsApp
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {(notifyForm.channel === 'email' || notifyForm.channel === 'both') && notifConfig.email && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email *</label>
+                <input
+                  type="email"
+                  placeholder="recipient@example.com"
+                  value={notifyForm.email}
+                  onChange={(e) => setNotifyForm((f) => ({ ...f, email: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
+            {(notifyForm.channel === 'whatsapp' || notifyForm.channel === 'both') && notifConfig.whatsapp && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Phone *</label>
+                <input
+                  type="tel"
+                  placeholder="+919876543210"
+                  value={notifyForm.phone}
+                  onChange={(e) => setNotifyForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Custom message (optional)</label>
+              <textarea
+                rows={2}
+                value={notifyForm.customMessage}
+                onChange={(e) => setNotifyForm((f) => ({ ...f, customMessage: e.target.value }))}
+                placeholder="Add a personal note to the notification..."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <Button variant="primary" isLoading={isSendingNotif} onClick={handleSendNotification}>
+                <BellIcon className="h-4 w-4" /> Send Notification
+              </Button>
+              <Button variant="secondary" onClick={() => setNotifyTask(null)}>Cancel</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

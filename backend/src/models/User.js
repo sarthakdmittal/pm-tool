@@ -27,6 +27,10 @@ const userSchema = new mongoose.Schema(
       enum: ['admin', 'member'],
       default: 'member',
     },
+    phone: {
+      type: String,
+      trim: true,
+    },
   },
   { timestamps: true }
 );

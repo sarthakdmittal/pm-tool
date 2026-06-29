@@ -1,5 +1,5 @@
 import React from 'react';
-import { cx, getProgressColor } from '@/lib/utils';
+import { cx } from '@/lib/utils';
 
 interface ProgressBarProps {
   value: number;
@@ -15,6 +15,13 @@ const sizeClasses: Record<string, string> = {
   lg: 'h-4',
 };
 
+// Use inline style so the color is never purged by Tailwind's JIT scanner
+function barBgColor(percent: number): string {
+  if (percent >= 70) return '#22c55e'; // green-500
+  if (percent >= 40) return '#eab308'; // yellow-500
+  return '#ef4444'; // red-500
+}
+
 const ProgressBar: React.FC<ProgressBarProps> = ({
   value,
   showLabel = false,
@@ -23,7 +30,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   colorOverride,
 }) => {
   const clampedValue = Math.min(100, Math.max(0, value));
-  const barColor = colorOverride || getProgressColor(clampedValue);
 
   return (
     <div className={cx('w-full', className)}>
@@ -35,8 +41,8 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
       )}
       <div className={cx('w-full bg-gray-200 rounded-full overflow-hidden', sizeClasses[size])}>
         <div
-          className={cx('h-full rounded-full transition-all duration-500', barColor)}
-          style={{ width: `${clampedValue}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${clampedValue}%`, backgroundColor: colorOverride || barBgColor(clampedValue) }}
         />
       </div>
     </div>
