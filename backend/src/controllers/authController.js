@@ -158,4 +158,19 @@ const updateUserRole = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, me, updateMe, claimAdmin, getUsers, updateUserRole };
+// Admin: update any user's name / phone
+const updateUserByAdmin = async (req, res, next) => {
+  try {
+    const { name, phone } = req.body;
+    const updates = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (phone !== undefined) updates.phone = phone.trim() || null;
+    const user = await User.findByIdAndUpdate(req.params.userId, updates, { new: true }).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { register, login, me, updateMe, claimAdmin, getUsers, updateUserRole, updateUserByAdmin };

@@ -49,6 +49,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   // Notification state
   const [notifConfig, setNotifConfig] = useState<NotifConfig>({ email: false, whatsapp: false });
+  const [allUsers, setAllUsers] = useState<{ name: string; email: string; phone?: string | null }[]>([]);
   const [notifyTask, setNotifyTask] = useState<Task | null>(null);
   const [notifyForm, setNotifyForm] = useState<NotifyForm>({ email: '', phone: '', channel: 'email', customMessage: '' });
   const [isSendingNotif, setIsSendingNotif] = useState(false);
@@ -74,8 +75,12 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   useEffect(() => {
     fetchData();
-    // Check which notification channels are configured
     api.get<NotifConfig>('/api/notifications/config').then((r) => setNotifConfig(r.data)).catch(() => {});
+    if (admin) {
+      api.get<{ name: string; email: string; phone?: string | null }[]>('/api/auth/users')
+        .then((r) => setAllUsers(r.data))
+        .catch(() => {});
+    }
   }, [id]);
 
   const openAdd = () => {
@@ -131,7 +136,16 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   const openNotify = (task: Task) => {
     setNotifyTask(task);
-    setNotifyForm({ email: '', phone: '', channel: notifConfig.email ? 'email' : 'whatsapp', customMessage: '' });
+    // Auto-fill from matched user
+    const matched = allUsers.find(
+      (u) => u.name.toLowerCase() === (task.assignedTo || '').toLowerCase()
+    );
+    setNotifyForm({
+      email: matched?.email || '',
+      phone: matched?.phone || '',
+      channel: notifConfig.email ? 'email' : 'whatsapp',
+      customMessage: '',
+    });
   };
 
   const handleSendNotification = async () => {
