@@ -72,11 +72,11 @@ const updatePhase = async (req, res, next) => {
       return res.status(404).json({ message: 'Phase not found' });
     }
 
-    if (completionPercent !== undefined) phase.completionPercent = completionPercent;
+    if (completionPercent !== undefined) phase.completionPercent = Number(completionPercent);
     if (status !== undefined) phase.status = status;
     if (notes !== undefined) phase.notes = notes;
-    if (startDate !== undefined) phase.startDate = startDate;
-    if (endDate !== undefined) phase.endDate = endDate;
+    if (startDate !== undefined) phase.startDate = startDate || null;
+    if (endDate !== undefined) phase.endDate = endDate || null;
 
     await phase.save();
 
