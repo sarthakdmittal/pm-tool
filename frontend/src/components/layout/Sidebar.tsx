@@ -20,12 +20,17 @@ import {
 import { cx } from '@/lib/utils';
 import { isAdmin } from '@/lib/auth';
 
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
 function getProjectId(pathname: string): string | null {
   const match = pathname.match(/^\/projects\/([^/]+)/);
   return match ? match[1] : null;
 }
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const admin = isAdmin();
 
@@ -35,64 +40,31 @@ const Sidebar: React.FC = () => {
     ...(admin ? [{ href: '/upload', label: 'Upload Excel', icon: ArrowUpTrayIcon }] : []),
     { href: '/settings', label: 'Settings & Users', icon: Cog6ToothIcon },
   ];
+
   const projectId = getProjectId(pathname);
   const isOnProject = Boolean(projectId);
 
-  const projectSubLinks = projectId
-    ? [
-        {
-          href: `/projects/${projectId}`,
-          label: 'Overview',
-          icon: Squares2X2Icon,
-          exact: true,
-        },
-        {
-          href: `/projects/${projectId}/phases`,
-          label: 'Phases',
-          icon: ChartBarIcon,
-          exact: false,
-        },
-        {
-          href: `/projects/${projectId}/materials`,
-          label: 'Materials',
-          icon: ClipboardDocumentListIcon,
-          exact: false,
-        },
-        {
-          href: `/projects/${projectId}/active-devices`,
-          label: 'Active Devices',
-          icon: CpuChipIcon,
-          exact: false,
-        },
-        {
-          href: `/projects/${projectId}/epbax`,
-          label: 'EPBAX',
-          icon: PhoneIcon,
-          exact: false,
-        },
-        {
-          href: `/projects/${projectId}/passive`,
-          label: 'Passive (Cabling)',
-          icon: WifiIcon,
-          exact: false,
-        },
-        {
-          href: `/projects/${projectId}/tasks`,
-          label: 'Tasks',
-          icon: CheckCircleIcon,
-          exact: false,
-        },
-        {
-          href: `/projects/${projectId}/payments`,
-          label: 'Payments',
-          icon: CurrencyDollarIcon,
-          exact: false,
-        },
-      ]
-    : [];
+  const projectSubLinks = projectId ? [
+    { href: `/projects/${projectId}`, label: 'Overview', icon: Squares2X2Icon, exact: true },
+    { href: `/projects/${projectId}/phases`, label: 'Phases', icon: ChartBarIcon, exact: false },
+    { href: `/projects/${projectId}/materials`, label: 'Materials', icon: ClipboardDocumentListIcon, exact: false },
+    { href: `/projects/${projectId}/active-devices`, label: 'Active Devices', icon: CpuChipIcon, exact: false },
+    { href: `/projects/${projectId}/epbax`, label: 'EPBAX', icon: PhoneIcon, exact: false },
+    { href: `/projects/${projectId}/passive`, label: 'Passive (Cabling)', icon: WifiIcon, exact: false },
+    { href: `/projects/${projectId}/tasks`, label: 'Tasks', icon: CheckCircleIcon, exact: false },
+    { href: `/projects/${projectId}/payments`, label: 'Payments', icon: CurrencyDollarIcon, exact: false },
+  ] : [];
 
   return (
-    <aside className="w-64 min-h-screen bg-[#1e293b] flex flex-col">
+    <aside
+      className={cx(
+        // Mobile: fixed overlay, slide in/out
+        'fixed inset-y-0 left-0 z-50 w-64 bg-[#1e293b] flex flex-col transition-transform duration-300',
+        // Desktop: static, always visible
+        'md:relative md:translate-x-0 md:z-auto',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
         <div className="bg-blue-500 rounded-lg p-2">
@@ -109,11 +81,10 @@ const Sidebar: React.FC = () => {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={cx(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'
               )}
             >
               <Icon className="h-5 w-5 flex-shrink-0" />
@@ -122,7 +93,6 @@ const Sidebar: React.FC = () => {
           );
         })}
 
-        {/* Project sub-navigation */}
         {isOnProject && projectSubLinks.length > 0 && (
           <div className="pt-4">
             <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
@@ -135,6 +105,7 @@ const Sidebar: React.FC = () => {
                   <Link
                     key={href}
                     href={href}
+                    onClick={onClose}
                     className={cx(
                       'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                       isActive
@@ -152,7 +123,6 @@ const Sidebar: React.FC = () => {
         )}
       </nav>
 
-      {/* Footer */}
       <div className="px-6 py-4 border-t border-white/10">
         <p className="text-xs text-slate-500">PM Tool v1.0</p>
       </div>
