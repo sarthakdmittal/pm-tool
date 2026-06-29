@@ -7,13 +7,28 @@ let emailTransporter = null;
 function getEmailTransporter() {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
   if (!emailTransporter) {
-    emailTransporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // Gmail App Password
-      },
-    });
+    // If EMAIL_HOST is set, use generic SMTP (any provider).
+    // Otherwise fall back to Gmail shorthand for convenience.
+    if (process.env.EMAIL_HOST) {
+      emailTransporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port: parseInt(process.env.EMAIL_PORT || '587', 10),
+        secure: process.env.EMAIL_SECURE === 'true', // true for port 465, false for 587
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+    } else {
+      // Gmail shorthand (no EMAIL_HOST needed)
+      emailTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+    }
   }
   return emailTransporter;
 }
@@ -21,12 +36,10 @@ function getEmailTransporter() {
 async function sendEmail({ to, subject, html }) {
   const transporter = getEmailTransporter();
   if (!transporter) throw new Error('Email not configured (EMAIL_USER / EMAIL_PASS missing)');
-  await transporter.sendMail({
-    from: `"PM Tool" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html,
-  });
+  const from = process.env.EMAIL_FROM
+    ? `"PM Tool" <${process.env.EMAIL_FROM}>`
+    : `"PM Tool" <${process.env.EMAIL_USER}>`;
+  await transporter.sendMail({ from, to, subject, html });
 }
 
 // ─── WhatsApp (Meta Cloud API) ─────────────────────────────────────────────────
