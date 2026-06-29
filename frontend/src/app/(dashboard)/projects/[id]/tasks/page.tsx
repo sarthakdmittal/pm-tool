@@ -387,28 +387,16 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
             {/* Channel selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Send via</label>
-              <div className="flex gap-2">
-                {notifConfig.email && (
-                  <button
-                    onClick={() => setNotifyForm((f) => ({ ...f, channel: notifConfig.whatsapp ? (f.channel === 'email' ? 'email' : f.channel === 'whatsapp' ? 'whatsapp' : 'both') : 'email' }))}
-                    className={cx('flex-1 py-2 rounded-lg border text-sm font-medium transition-colors',
-                      (notifyForm.channel === 'email' || notifyForm.channel === 'both') ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}
-                    onClick={() => setNotifyForm((f) => ({ ...f, channel: f.channel === 'whatsapp' ? 'both' : f.channel === 'both' ? 'whatsapp' : 'email' }))}
-                  >
-                    Email
-                  </button>
-                )}
-                {notifConfig.whatsapp && (
-                  <button
-                    className={cx('flex-1 py-2 rounded-lg border text-sm font-medium transition-colors',
-                      (notifyForm.channel === 'whatsapp' || notifyForm.channel === 'both') ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}
-                    onClick={() => setNotifyForm((f) => ({ ...f, channel: f.channel === 'email' ? 'both' : f.channel === 'both' ? 'email' : 'whatsapp' }))}
-                  >
-                    WhatsApp
-                  </button>
-                )}
-              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Send via</label>
+              <select
+                value={notifyForm.channel}
+                onChange={(e) => setNotifyForm((f) => ({ ...f, channel: e.target.value as NotifyForm['channel'] }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {notifConfig.email && <option value="email">Email</option>}
+                {notifConfig.whatsapp && <option value="whatsapp">WhatsApp</option>}
+                {notifConfig.email && notifConfig.whatsapp && <option value="both">Both (Email + WhatsApp)</option>}
+              </select>
             </div>
 
             {(notifyForm.channel === 'email' || notifyForm.channel === 'both') && notifConfig.email && (
